@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { USERS_BBDD } from "../bbdd.js";
+import userModel from '../schemas/user-schema.js';
 
 const accountRouter = Router();
 
@@ -12,56 +12,63 @@ accountRouter.use((req, res, next) => {
 })
 
 //Ver detalles de una cuenta
-accountRouter.get('/:guid', (req, res) => {
+accountRouter.get('/:guid', async (req, res) => {
     const {guid} = req.params
-    const user = USERS_BBDD.find(user => user.guid == guid);
+    const user = await userModel.findById(guid).exec();
     
     if(!user) return res.status(404).send();
 
     return res.send(user);
 });
 
-//Crear una cuenta
-accountRouter.post('/', (req, res) => {
+//Crear una cuenta con id y nombre
+accountRouter.post('/', async (req, res) => {
     const {guid, name} = req.body;
 
     if(!guid || !name) return res.status(400).send();
 
-    const user = USERS_BBDD.find(user => user.guid == guid);
-    if(user) return res.status(409).send();
+    //buscamos en la BBDD si ya existe el usuario usando el guid
+    const user = await userModel.findById(guid).exec();
 
-    USERS_BBDD.push({
-        guid,name
-    });
+    if(user) return res.status(409).send('El usuario ya se encuentra registrado');
 
-    return res.send()
+    //crear una instancia del modelo, es decir, un usuario
+    const newUser = new userModel({_id: guid, name: name});
+    await newUser.save();
+
+    return res.send('Usuario registrado');
 });
 
-//Actualizar una cuenta
-accountRouter.patch('/:guid', (req, res) => {
+//Actualizar una cuenta(cambiar el nombre)
+accountRouter.patch('/:guid', async (req, res) => {
     const {guid} = req.params;
     const {name} = req.body;
 
     if(!name) return res.status(400).send(); //si no le pasas un nuevo nombre
 
-    const user = USERS_BBDD.find(user => user.guid == guid);
+    const user = await userModel.findById(guid).exec();
     
     if(!user) return res.status(404).send(); //si no encuentra el usuario para modificar
 
     user.name = name;
 
+    await user.save();
+
     return res.send();
 
 });
 
-//Eliminar cuenta
-accountRouter.delete('/:guid', (req, res) => {
+//Eliminar cuenta usando el id
+accountRouter.delete('/:guid', async (req, res) => {
     const {guid} = req.params
-    const userIndex = USERS_BBDD.findIndex(user => user.guid == guid);
+    const user = await userModel.findById(guid).exec();
     
-    if(!userIndex == -1) return res.status(404).send();
+    if(!user) return res.status(404).send();
+    
+    console.log(user);
 
-    USERS_BBDD.splice(userIndex, 1)
+    await user.deleteOne();
+
     return res.send();
 });
 
